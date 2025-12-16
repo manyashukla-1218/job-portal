@@ -1,138 +1,138 @@
-const express = require('express')
-const app = express()
-const cors = require('cors')
-const port = process.env.PORT || 3000;
-require('dotenv').config()
-// Middleware
-app.use(express.json())
-app.use(cors( {
-origin: ["https://https://mern-job-portal-website.vercel.app/"],
-  methods: ["POST", "GET"],
-  credentials: true
-}
-));
+// ================== CONFIG ==================
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
-app.get('/', (req, res) => {
-  res.send('Hello Developer')
-})
+const app = express();
+const port = process.env.PORT || 5000;
 
-// Username - lakshay22dhoundiyal
-// Password - u97klyTxI0FAnbnn
+// ================== MIDDLEWARE ==================
+app.use(express.json());
 
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://mern-job-portal-website.vercel.app",
+    ],
+    methods: ["GET", "POST", "PATCH", "DELETE"],
+    credentials: true,
+  })
+);
 
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@job-portal.7ieojkl.mongodb.net/?retryWrites=true&w=majority&appName=job-portal`;
+// ================== BASIC ROUTES ==================
+app.get("/", (req, res) => {
+  res.send("Job Portal API is running 🚀");
+});
 
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "OK",
+    message: "Server is healthy",
+    time: new Date(),
+  });
+});
+
+// ================== DATABASE ==================
+const uri = process.env.MONGO_URI;
+
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
 
 async function run() {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
-
-    //Create Database
-
     const db = client.db("mernJobPortal");
-    const jobsCollections = db.collection("demoJobs");
 
-    // Posting a Job
+    const jobsCollection = db.collection("jobs");
+    const applicationsCollection = db.collection("applications");
 
-    app.post("/post-job", async(req, res) => {
-      const body = req.body;
-      body.createAt = new Date();
-      // console.log(body)
-      const result = await jobsCollections.insertOne(body);
-      if(result.insertedId){
-        return res.status(200).send(result);
-        }else{
-          return res.status(404).send({
-            message: "Failed to post job! Try again later",
-            status: false
-          })
-      }
-    })
+    // ================== JOB APIs ==================
 
-    // Get all jobs
-    app.get("/all-jobs", async(req, res) => {
-      const jobs = await jobsCollections.find({}).toArray()
+    // Create Job
+    app.post("/post-job", async (req, res) => {
+      const job = {
+        ...req.body,
+        createdAt: new Date(),
+      };
+
+      const result = await jobsCollection.insertOne(job);
+      res.send(result);
+    });
+
+    // Get All Jobs
+    app.get("/all-jobs", async (req, res) => {
+      const jobs = await jobsCollection.find({}).toArray();
       res.send(jobs);
-    })
+    });
 
-    // Get Single job using ID
-    app.get("/all-jobs/:id", async(req, res) => {
-      const id = req.params.id;
-      const job = await jobsCollections.findOne({
-        _id: new ObjectId(id)
-      })
-      res.send(job)
-    })
+    // Get Single Job
+    app.get("/all-jobs/:id", async (req, res) => {
+      const job = await jobsCollection.findOne({
+        _id: new ObjectId(req.params.id),
+      });
+      res.send(job);
+    });
 
-    // Get Jobs by email
+    // Get Jobs by User Email
+    app.get("/myJobs/:email", async (req, res) => {
+      const jobs = await jobsCollection
+        .find({ postedBy: req.params.email })
+        .toArray();
+      res.send(jobs);
+    });
 
-    app.get ("/myJobs/:email", async(req, res) => {
-      // console.log(req.params.email)
-      const jobs = await jobsCollections.find({postedBy : req.params.email}).toArray();
-      res.send(jobs)
-    })
+    // Update Job
+    app.patch("/update-job/:id", async (req, res) => {
+      const result = await jobsCollection.updateOne(
+        { _id: new ObjectId(req.params.id) },
+        { $set: req.body },
+        { upsert: true }
+      );
+      res.send(result);
+    });
 
-    // Delete a Job
-    app.delete("/job/:id", async(req, res) => {
-      const id = req.params.id;
-      const filter = {_id: new ObjectId(id)}
-      const result = await jobsCollections.deleteOne(filter);
-      res.send(result)
-    })
+    // Delete Job
+    app.delete("/job/:id", async (req, res) => {
+      const result = await jobsCollection.deleteOne({
+        _id: new ObjectId(req.params.id),
+      });
+      res.send(result);
+    });
 
-    //Update a Job
-    app.patch("/update-job/:id", async(req, res) => {
-      const id = req.params.id;
-      const jobData = req.body;
-      const filter = {_id: new ObjectId(id)};
-      const options = { upsert: true};
-      const updateDoc = {
-        $set: {
-          ...jobData
-        },
-    };
+    // ================== APPLY JOB API ==================
+    app.post("/job/:id/apply", async (req, res) => {
+      const application = {
+        jobId: new ObjectId(req.params.id),
+        email: req.body.email,
+        resumeLink: req.body.resumeLink,
+        appliedAt: new Date(),
+      };
 
-    const result = await jobsCollections.updateOne(filter, updateDoc, options);
-    res.send(result)
-  })
+      const result = await applicationsCollection.insertOne(application);
+      res.send({
+        message: "Application submitted successfully ✅",
+        result,
+      });
+    });
 
-  // Resume Submission
-  // API endpoint to handle job applications (POST request)
-app.post('/job/:id', async (req, res) => {
-  const { jobId, resumeLink } = req.body;
-
-  try {
-    const newApplication = new JobApplication({ jobId, resumeLink });
-    await newApplication.save();
-
-    res.json({ message: 'Application submitted successfully!' });
-    console.log('Application saved:', newApplication);
-  } catch (error) {
-    console.error('Error saving application:', error.message);
-    res.status(500).json({ message: 'Server Error' });
-  }
-});
-
-    // Send a ping to confirm a successful connection
+    // ================== DB PING ==================
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
-  } finally {
-    // Ensures that the client will close when you finish/error
-    // await client.close();
+    console.log("✅ MongoDB connected successfully");
+  } catch (error) {
+    console.error(error);
   }
 }
-run().catch(console.dir);
 
+run();
+
+// ================== SERVER ==================
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
-})
+  console.log(`🚀 Server running on port ${port}`);
+});
