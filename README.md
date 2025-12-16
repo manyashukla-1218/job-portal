@@ -30,6 +30,8 @@ This full-stack web application is designed to bridge the gap between job seeker
 🏢 Employers & Recruiters: Companies or recruiters seeking an efficient platform to post job listings and manage applicants.
 🧑‍💼 Admins: Admins looking to manage job listings, users, and queries to ensure a smooth-running platform.
 🌍 Anyone: Looking to either find job opportunities or post job openings on a reliable platform.
+
+
 ⚙️ Technologies Used
 Frontend:
 ⚛️ React.js
